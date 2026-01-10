@@ -265,7 +265,7 @@ def render_header():
         </style>
         <div class="hcmue-header">
             <h1 style="margin:0; font-size: 42px;">CHATBOT HCMUE</h1>
-            <p style="margin:5px 0 0 0; opacity: 0.8; font-size: 18px;">Tư vấn quy chế đào tạo cho sinh viên khóa 50 trình độ đại học và cao đẳng tại Trường Đại học Sư phạm Thành phố Hồ Chí Minh</p>
+            <p style="margin:5px 0 0 0; opacity: 0.8; font-size: 18px;">Tư vấn quy chế đào tạo cho sinh viên khóa 50 hệ chính quy và cao đẳng tại Trường Đại học Sư phạm Thành phố Hồ Chí Minh</p>
         </div>
         """,
         unsafe_allow_html=True,
