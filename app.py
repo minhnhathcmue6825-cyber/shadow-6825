@@ -18,7 +18,12 @@ from langchain_community.vectorstores import FAISS
 from langchain_core.prompts import PromptTemplate
 from langchain_classic.chains.question_answering import load_qa_chain
 
-
+# =========================
+# LOAD CSS
+# =========================
+def load_css(file_name):
+    with open(file_name, "r", encoding="utf-8") as f:
+        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
 # =========================
 # CẤU HÌNH
 # =========================
@@ -497,6 +502,7 @@ def reset_chat():
 # =========================
 def main():
     st.set_page_config(page_title=APP_TITLE, layout="wide")
+    load_css("sidebar.css")
     render_header()
     render_sidebar_content()
     load_dotenv()
