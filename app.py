@@ -1,7 +1,3 @@
-
-Folder highlights
-Content centers on HCMUE Undergraduate Regulation including credit/course details and academic handling, effective from 2023.
-
 import os
 import time
 import json
