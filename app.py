@@ -5,10 +5,7 @@ import re
 from dotenv import load_dotenv
 from datetime import date
 from pathlib import Path
-
 import streamlit as st
-from dotenv import load_dotenv
-
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_google_genai import (
     GoogleGenerativeAIEmbeddings,
@@ -20,8 +17,6 @@ from langchain_classic.chains.question_answering import load_qa_chain
 
 #==========Thêm API======
 load_dotenv()
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-api_key = os.getenv("OPENAI_API_KEY")
 # =========================
 # CẤU HÌNH
 # =========================
