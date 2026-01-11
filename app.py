@@ -501,7 +501,7 @@ def main():
     api_key = os.getenv("GOOGLE_API_KEY") or st.secrets.get(
         "GOOGLE_API_KEY"
     )
-    st.write("KEY EXISTS:", "GOOGLE_API_KEY" in st.secrets)
+    #st.write("KEY EXISTS:", "GOOGLE_API_KEY" in st.secrets)
     if not api_key:
         st.error("Chưa cấu hình GOOGLE_API_KEY.")
         st.stop()
