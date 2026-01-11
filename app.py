@@ -1,13 +1,17 @@
+
+Folder highlights
+Content centers on HCMUE Undergraduate Regulation including credit/course details and academic handling, effective from 2023.
+
 import os
 import time
 import json
 import re
-
+import base64
 from datetime import date
 from pathlib import Path
 
 import streamlit as st
-
+from dotenv import load_dotenv
 
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_google_genai import (
@@ -17,14 +21,8 @@ from langchain_google_genai import (
 from langchain_community.vectorstores import FAISS
 from langchain_core.prompts import PromptTemplate
 from langchain_classic.chains.question_answering import load_qa_chain
-#==========================
 
-# =========================
-# LOAD CSS
-# =========================
-def load_css(file_name):
-    with open(file_name, "r", encoding="utf-8") as f:
-        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+
 # =========================
 # CẤU HÌNH
 # =========================
@@ -266,7 +264,7 @@ def render_header():
         </style>
         <div class="hcmue-header">
             <h1 style="margin:0; font-size: 42px;">CHATBOT HCMUE</h1>
-            <p style="margin:5px 0 0 0; opacity: 0.8; font-size: 18px;">Tư vấn quy chế đào tạo cho sinh viên khóa 50 hệ chính quy và cao đẳng tại Trường Đại học Sư phạm Thành phố Hồ Chí Minh</p>
+            <p style="margin:5px 0 0 0; opacity: 0.8; font-size: 18px;">Tư vấn quy chế đào tạo cho sinh viên khóa 50 trình độ đại học và cao đẳng tại Trường Đại học Sư phạm Thành phố Hồ Chí Minh</p>
         </div>
         """,
         unsafe_allow_html=True,
@@ -503,7 +501,6 @@ def reset_chat():
 # =========================
 def main():
     st.set_page_config(page_title=APP_TITLE, layout="wide")
-    load_css("sidebar.css")
     render_header()
     render_sidebar_content()
     load_dotenv()
