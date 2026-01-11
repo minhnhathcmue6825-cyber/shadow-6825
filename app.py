@@ -17,7 +17,8 @@ from langchain_google_genai import (
 from langchain_community.vectorstores import FAISS
 from langchain_core.prompts import PromptTemplate
 from langchain_classic.chains.question_answering import load_qa_chain
-
+#==========================
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 # =========================
 # LOAD CSS
 # =========================
