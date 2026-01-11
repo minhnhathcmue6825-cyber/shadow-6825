@@ -2,7 +2,7 @@ import os
 import time
 import json
 import re
-import base64
+from dotenv import load_dotenv
 from datetime import date
 from pathlib import Path
 
@@ -18,7 +18,9 @@ from langchain_community.vectorstores import FAISS
 from langchain_core.prompts import PromptTemplate
 from langchain_classic.chains.question_answering import load_qa_chain
 
-
+#==========Thêm API======
+load_dotenv()
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 # =========================
 # CẤU HÌNH
 # =========================
