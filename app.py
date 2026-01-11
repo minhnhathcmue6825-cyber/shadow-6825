@@ -2,12 +2,12 @@ import os
 import time
 import json
 import re
-from openai import OpenAI
+
 from datetime import date
 from pathlib import Path
 
 import streamlit as st
-from dotenv import load_dotenv
+
 
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_google_genai import (
@@ -18,7 +18,7 @@ from langchain_community.vectorstores import FAISS
 from langchain_core.prompts import PromptTemplate
 from langchain_classic.chains.question_answering import load_qa_chain
 #==========================
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
 # =========================
 # LOAD CSS
 # =========================
