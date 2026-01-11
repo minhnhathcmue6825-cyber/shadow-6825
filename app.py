@@ -2,7 +2,7 @@ import os
 import time
 import json
 import re
-import base64
+from openai import OpenAI
 from datetime import date
 from pathlib import Path
 
