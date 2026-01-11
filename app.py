@@ -416,7 +416,7 @@ def load_kb_vectorstore(api_key: str):
 def load_qa_chain_cached(api_key: str):
     prompt_template = """
 Bạn là trợ lý hỗ trợ sinh viên.
-Trả lời ngắn gọn, rõ ràng, dễ hiểu, phải dựa vào NGỮ CẢNH được cung cấp, và phải nó nó nằm ở phần nào trong tài liệu.
+Trả lời ngắn gọn, rõ ràng, dễ hiểu, phải dựa vào NGỮ CẢNH được cung cấp, và phải nó nó nằm ở phần nào trong file chunks.
 
 NGỮ CẢNH:
 {context}
