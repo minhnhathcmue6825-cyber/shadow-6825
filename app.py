@@ -414,9 +414,10 @@ def load_kb_vectorstore(api_key: str):
 @st.cache_resource
 def load_qa_chain_cached(api_key: str):
     prompt_template = """
-Bạn là trợ lý hỗ trợ sinh viên.
-Trả lời ngắn gọn, rõ ràng, dễ hiểu, phải dựa vào NGỮ CẢNH được cung cấp, và phải nó nó nằm ở phần nào trong file chunks.
-
+Bạn là trợ lý hỗ trợ sinh viên HCMUE.
+Hãy trả lời đầy đủ và chính xác dựa trên ngữ cảnh. 
+Nếu thông tin dài, hãy chia thành các ý đầu dòng cho dễ đọc.
+Bắt buộc ghi rõ thông tin nằm ở phần nào/điều nào trong tài liệu.
 NGỮ CẢNH:
 {context}
 
@@ -571,7 +572,7 @@ def main():
                     if i % 3 == 0 or i == len(words) - 1:
                         with placeholder:
                             display_chat_message("assistant", full_display.strip())
-                        time.sleep(0.01)
+                        time.sleep(0.04)
 
                 # Lưu vào lịch sử
                 st.session_state.messages.append({"role": "assistant", "content": sanitized})
