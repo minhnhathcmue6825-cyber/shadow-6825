@@ -317,7 +317,7 @@ def render_sidebar_content():
     st.sidebar.markdown('<p class="sidebar-section-title">Gợi ý một số câu hỏi</p>', unsafe_allow_html=True)
 
     quick_questions = [
-        ("Cảnh báo học vụ", "Điều kiện bị cảnh báo học tập và buộc thôi học là gì?"),
+        ("Cảnh báo học vụ", "Điều kiện bị cảnh báo học tập là gì?"),
         ("Giới hạn tín chỉ", "Giới hạn tín chỉ tối thiểu tối đa mỗi học kỳ được quy định thế nào?"),
         ("Tạm dừng học", "Sinh viên được tạm dừng học trong những trường hợp nào?"),
         ("Điều kiện tốt nghiệp ", " Điều kiện để được xét công nhận tốt nghiệp là gì?"),
