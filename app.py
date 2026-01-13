@@ -38,7 +38,7 @@ MAX_REQUESTS_PER_DAY = 30
 CHUNK_SIZE = 1200
 CHUNK_OVERLAP = 200
 TOP_K = 4
-MAX_OUTPUT_TOKENS = 2048
+MAX_OUTPUT_TOKENS = 1000
 TEMPERATURE = 0.2
 # =========================
 # HEADER
@@ -414,10 +414,8 @@ def load_kb_vectorstore(api_key: str):
 @st.cache_resource
 def load_qa_chain_cached(api_key: str):
     prompt_template = """
-Bạn là trợ lý hỗ trợ sinh viên HCMUE.
-Hãy trả lời đầy đủ và chính xác dựa trên ngữ cảnh. 
-Nếu thông tin dài, hãy chia thành các ý đầu dòng cho dễ đọc.
-Bắt buộc ghi rõ thông tin nằm ở phần nào/điều nào trong tài liệu.
+Bạn là trợ lý hỗ trợ sinh viên.
+Trả lời ngắn gọn, rõ ràng, đúng trọng tâm.
 NGỮ CẢNH:
 {context}
 
