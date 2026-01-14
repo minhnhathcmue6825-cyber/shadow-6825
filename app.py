@@ -416,7 +416,7 @@ def load_qa_chain_cached(api_key: str):
     prompt_template = """
 Bạn là trợ lý hỗ trợ sinh viên.
 Trả lời ngắn gọn, rõ ràng, đúng trọng tâm.
-Chỉ ra vị trí thông tin trả lời trong tài liệu.
+Chỉ ra thông tin nằm ở chỗ nào.
 NGỮ CẢNH:
 {context}
 
