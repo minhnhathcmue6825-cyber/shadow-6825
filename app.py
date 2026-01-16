@@ -1,7 +1,3 @@
-
-Folder highlights
-Source code and JSON data detail a Streamlit chatbot application supporting HCMUE's student regulation queries with Gemini-2.5-Flash.
-
 import os
 import time
 import json
