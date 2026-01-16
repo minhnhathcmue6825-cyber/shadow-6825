@@ -30,7 +30,7 @@ APP_DIR = Path(__file__).resolve().parent
 KB_JSON_PATH = APP_DIR / "chunks.json"
 
 MODEL_NAME = "gemini-2.5-flash"
-EMBED_MODEL = "models/gemini-embedding-001"
+EMBED_MODEL = "models/embedding-001"
 
 MIN_SECONDS_BETWEEN_REQUESTS = 2
 MAX_REQUESTS_PER_DAY = 30
@@ -391,7 +391,7 @@ def load_kb_texts():
 
 
 @st.cache_resource(show_spinner=True)
-def load_kb_vectorstore(api_key: str):
+def load_kb_vectorstore():
     texts = load_kb_texts()
 
     splitter = RecursiveCharacterTextSplitter(
@@ -403,16 +403,22 @@ def load_kb_vectorstore(api_key: str):
     for t in texts:
         chunks.extend(splitter.split_text(t))
 
+    api_key = os.getenv("GOOGLE_API_KEY") or st.secrets.get("GOOGLE_API_KEY")
+
     embeddings = GoogleGenerativeAIEmbeddings(
-        model=EMBED_MODEL,
+        model="models/embedding-001",
         google_api_key=api_key,
     )
 
+    # DEBUG thử 1 embedding trước
+    test = embeddings.embed_query("test")
+    print("Embedding OK, len =", len(test))
+
     return FAISS.from_texts(chunks, embedding=embeddings)
 
-
-@st.cache_resource
-def load_qa_chain_cached(api_key: str):
+@st.cache_resource(show_spinner=True)
+def load_kb_vectorstore():
+    api_key = os.getenv("GOOGLE_API_KEY") or st.secrets.get("GOOGLE_API_KEY")
     prompt_template = """
 Bạn là trợ lý hỗ trợ sinh viên.
 Trả lời ngắn gọn, rõ ràng, đúng trọng tâm.
@@ -504,7 +510,7 @@ def main():
     if not api_key:
         st.error("Chưa cấu hình GOOGLE_API_KEY.")
         st.stop()
-
+    
     st.session_state.setdefault(
         "messages",
         [
