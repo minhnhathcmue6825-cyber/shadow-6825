@@ -1,7 +1,3 @@
-
-Folder highlights
-Source code and JSON data detail a Streamlit chatbot application supporting HCMUE's student regulation queries with Gemini-2.5-Flash.
-
 import os
 import time
 import json
@@ -36,7 +32,7 @@ APP_DIR = Path(__file__).resolve().parent
 KB_JSON_PATH = APP_DIR / "chunks.json"
 
 MODEL_NAME = "gemini-2.5-flash"
-EMBED_MODEL = "models/gemini-embedding-001"
+EMBED_MODEL = "models/embedding-001"
 
 MIN_SECONDS_BETWEEN_REQUESTS = 2
 MAX_REQUESTS_PER_DAY = 30
