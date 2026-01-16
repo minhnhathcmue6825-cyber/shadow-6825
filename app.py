@@ -406,13 +406,100 @@ def load_kb_vectorstore(api_key: str):
     for t in texts:
         chunks.extend(splitter.split_text(t))
 
+    if not chunks:
+        raise ValueError("Không có chunk nào sau khi tách văn bản.")
+
+    st.write(f"Total chunks: {len(chunks)}")
+
     embeddings = GoogleGenerativeAIEmbeddings(
         model=EMBED_MODEL,
         google_api_key=api_key,
     )
 
-    return FAISS.from_texts(chunks, embedding=embeddings)
+    # Test nhanh vài chunk để hiển thị lỗi gốc (nếu có)
+    try:
+        sample = chunks[:3] if len(chunks) >= 3 else chunks
+        test_resp = embeddings.embed_documents(sample)
+        st.write(f"Embed test OK: {len(test_resp)} vectors returned for {len(sample)} sample(s).")
+    except Exception as e:
+        st.error("Lỗi khi gọi embed_documents (test 3 chunks):")
+        st.text(repr(e))
+        try:
+            st.text(str(e.args))
+        except Exception:
+            pass
+        # Dừng ở đây để bạn có thể xem lỗi gốc và sửa key / model / quota
+        raise
 
+    # Build FAISS theo batch để tránh gửi toàn bộ chunks 1 request
+    batch_size = 32  # giảm xuống nếu vẫn gặp lỗi (ví dụ 16 hoặc 8)
+    vs = None
+    created = False
+
+    for i in range(0, len(chunks), batch_size):
+        batch = chunks[i : i + batch_size]
+        st.write(f"Processing batch {i // batch_size + 1} ({len(batch)} items)...")
+        try:
+            # Thử embed batch — nếu lỗi, thử thu nhỏ để xác định mục gây lỗi
+            embeddings.embed_documents(batch)
+        except Exception as e:
+            st.error(f"Lỗi khi embed batch {i}-{i+len(batch)}:")
+            st.text(repr(e))
+            # thử embed từng item để tìm đoạn gây lỗi (nếu có)
+            for j, txt in enumerate(batch):
+                try:
+                    embeddings.embed_documents([txt])
+                except Exception as e_item:
+                    st.error(f"Lỗi khi embed chunk index {i + j}:")
+                    st.text(repr(e_item))
+                    raise
+            # nếu không tìm được item lỗi riêng lẻ, ném lỗi gốc
+            raise
+
+        try:
+            if not created:
+                # Tạo index từ batch đầu
+                vs = FAISS.from_texts(batch, embedding=embeddings)
+                created = True
+                st.write(f"FAISS created from first batch ({len(batch)} items).")
+            else:
+                # Thêm batch tiếp theo nếu phương thức tồn tại
+                if hasattr(vs, "add_texts"):
+                    vs.add_texts(batch)
+                    st.write(f"Added {len(batch)} texts to FAISS.")
+                elif hasattr(vs, "add_documents"):
+                    # một số phiên bản dùng add_documents
+                    vs.add_documents([{"page_content": t} for t in batch])
+                    st.write(f"Added {len(batch)} documents to FAISS.")
+                else:
+                    # Fallback: nếu không có phương thức add, thu thập toàn bộ và tạo lại (ít khả năng xảy ra)
+                    st.warning("FAISS instance không hỗ trợ add_texts/add_documents trên phiên bản này. Sẽ cố gắng tái tạo index ở cuối.")
+                    created = False
+                    break
+            # tránh rate limit
+            time.sleep(0.25)
+        except Exception as e:
+            st.error(f"Lỗi khi thêm batch vào FAISS (batch {i}-{i+len(batch)}):")
+            st.text(repr(e))
+            raise
+
+    # Nếu fallback xảy ra (không có add_texts), thử tạo index toàn bộ với batching an toàn:
+    if not created:
+        st.write("Tạo FAISS bằng fallback: thực hiện embed theo batch rồi tạo index một lần nữa (cẩn thận với quota).")
+        all_texts = chunks
+        try:
+            # Thực hiện một lần nữa, nhưng bằng from_texts (thư viện sẽ gọi embed bên trong)
+            vs = FAISS.from_texts(all_texts, embedding=embeddings)
+            st.write("FAISS created from all_texts via fallback.")
+        except Exception as e:
+            st.error("Lỗi khi tạo FAISS bằng fallback (from_texts trên all_texts):")
+            st.text(repr(e))
+            raise
+
+    if vs is None:
+        raise RuntimeError("Không thể tạo FAISS index (vs is None).")
+
+    return vs
 
 @st.cache_resource
 def load_qa_chain_cached(api_key: str):
