@@ -32,16 +32,16 @@ APP_DIR = Path(__file__).resolve().parent
 KB_JSON_PATH = APP_DIR / "chunks.json"
 
 MODEL_NAME = "gemini-2.5-flash"
-EMBED_MODEL = "models/embedding-001"
+EMBED_MODEL = "models/gemini-embedding-001"
 
 MIN_SECONDS_BETWEEN_REQUESTS = 2
 MAX_REQUESTS_PER_DAY = 30
 
-CHUNK_SIZE = 1600
-CHUNK_OVERLAP = 200
+CHUNK_SIZE = 1000
+CHUNK_OVERLAP = 100
 TOP_K = 4
 
-MAX_OUTPUT_TOKENS = 2048
+MAX_OUTPUT_TOKENS = 800
 TEMPERATURE = 0.2
 # =========================
 # HEADER
@@ -411,31 +411,8 @@ def load_kb_vectorstore(api_key: str):
         google_api_key=api_key,
     )
 
-    # --- Thử nghiệm embedding nhỏ để debug lỗi thật ---
-    try:
-        sample = chunks[:3] if len(chunks) >= 3 else chunks
-        test_resp = embeddings.embed_documents(sample)
-        # Hiển thị nhanh kết quả test (số vector trả về)
-        st.write(f"Embed test OK: {len(test_resp)} vectors returned for {len(sample)} sample(s).")
-    except Exception as e:
-        # In chi tiết lỗi để bạn kiểm tra trong UI / logs
-        st.error("Lỗi khi gọi embed_documents (test 3 chunks):")
-        st.text(repr(e))
-        # Nếu exception có thông tin thêm, hiển thị
-        try:
-            st.text(str(e.args))
-        except Exception:
-            pass
-        # Dừng ở đây để bạn không cố build index khi embed thất bại
-        raise
+    return FAISS.from_texts(chunks, embedding=embeddings)
 
-    # Nếu test OK, tiếp tục tạo FAISS (nếu số chunk lớn, cân nhắc batching)
-    try:
-        return FAISS.from_texts(chunks, embedding=embeddings)
-    except Exception as e:
-        st.error("Lỗi khi tạo FAISS từ texts:")
-        st.text(repr(e))
-        raise
 
 @st.cache_resource
 def load_qa_chain_cached(api_key: str):
