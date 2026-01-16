@@ -1,11 +1,12 @@
 import os
 import time
 import json
-import re
-from dotenv import load_dotenv
 from datetime import date
 from pathlib import Path
+
 import streamlit as st
+from dotenv import load_dotenv
+
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_google_genai import (
     GoogleGenerativeAIEmbeddings,
@@ -15,8 +16,7 @@ from langchain_community.vectorstores import FAISS
 from langchain_core.prompts import PromptTemplate
 from langchain_classic.chains.question_answering import load_qa_chain
 
-#==========Thêm API======
-load_dotenv()
+
 # =========================
 # CẤU HÌNH
 # =========================
@@ -29,17 +29,20 @@ APP_SUBTITLE = (
 APP_DIR = Path(__file__).resolve().parent
 KB_JSON_PATH = APP_DIR / "chunks.json"
 
-MODEL_NAME = "gemini-2.5-flash"
-EMBED_MODEL = "models/embedding-001"
+MODEL_NAME = "gemini-2.5-flash-lite"
+EMBED_MODEL = "models/gemini-embedding-001"
 
 MIN_SECONDS_BETWEEN_REQUESTS = 2
 MAX_REQUESTS_PER_DAY = 30
 
-CHUNK_SIZE = 1200
+CHUNK_SIZE = 1600
 CHUNK_OVERLAP = 200
 TOP_K = 4
-MAX_OUTPUT_TOKENS = 1000
+
+MAX_OUTPUT_TOKENS = 512
 TEMPERATURE = 0.2
+
+
 # =========================
 # HEADER
 # =========================
@@ -49,122 +52,24 @@ def render_header():
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
         <style>
             @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-            html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
-            .stApp { background-color: #f8f9fa; }
+            
+            html, body, [class*="css"] {
+                font-family: 'Inter', sans-serif;
+            }
 
-            /* Header Style: khung trắng, chữ xanh */
+            .stApp { background-color: #f8f9fa; }
+            
+            /* Header Style */
             .hcmue-header {
-                background-color: #ffffff;
-                color: #f1f5f0;
+                background-color: #124874;
                 padding: 2rem;
                 border-radius: 0 0 24px 24px;
+                color: white;
                 text-align: center;
                 margin-bottom: 30px;
-                box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-            }
-            .hcmue-header h1, .hcmue-header p { color: #124874; }
-
-            /* Change top black bar (Streamlit banner) to HCMUE blue */
-            header[role="banner"], header, .css-1v3fvcr, .css-13l3y2h, .stToolbar {
-                background-color: #124874 !important;
-                color: #ffffff !important;
-            }
-            [data-testid="stHeader"], [data-testid="stAppViewContainer"] > header {
-                background-color: #124874 !important;
-                color: #ffffff !important;
-            }
-            [data-testid="stHeader"]::before {
-                content: "TRƯỜNG ĐẠI HỌC SƯ PHẠM THÀNH PHỐ HỒ CHÍ MINH"; 
-                position: absolute;
-                left: 60px; 
-                font-size: 36px;
-                font-weight: 600;
-                color: #ffffff;
-                z-index: 1;
-                line-height: 2.8rem;
-            }
-            [data-testid="stChatInput"] {
-                background-color: transparent !important; 
-                border: none !important; /* Xóa viền ngoài */
-                box-shadow: none !important; /* Xóa bóng đổ ngoài */
-                padding: 10px !important;
-            }
-            
-            [data-testid="stChatInput"] > div {
-                background-color: transparent !important;
-                border: none !important;
-            }
-            [data-testid="stChatInput"] textarea {
-                background-color: #124874 !important;
-                color: #124874 !important;
-                -webkit-text-fill-color: #124874 !important;
-                border: none !important;
-            }
-            [data-testid="stBottomBlockContainer"], 
-            [data-testid="stBottom"], 
-            .stChatInputContainer, 
-            .stChatFooter {
-                background-color: #124874 !important;
-                background: #124874 !important;
-            }
-            
-            footer { display: none !important; }
-            [data-testid="stHeader"] { background-color: #124874 !important; }
-            footer,
-            .stFooter,
-            [data-testid="stFooter"],
-            [data-testid="stAppViewContainer"] footer,
-            .stApp .main footer {
-                background-color: #ffffff !important;
-                color: #124874 !important;
-                border-top: 1px solid #e6edf3 !important;
+                shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
             }
 
-            /* Phần tử nhập thực tế giữ nguyên để làm khung chat chính */
-            [data-testid="stChatInput"] textarea,
-            [data-testid="stChatInput"] input,
-            [data-testid="stChatInput"] div[role="textbox"],
-            .stChatInput textarea,
-            .stChatInput input,
-            .stChatInput [contenteditable="true"],
-            .stTextInput input,
-            .stTextArea textarea {
-                background-color: #ffffff !important;
-                color: #124874 !important;
-                caret-color: #124874 !important;
-                border: 1px solid #e6edf3 !important;
-                border-radius: 12px !important;
-                padding: 8px 12px !important;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.05) !important; 
-                outline: none !important;
-            }
-
-            [data-testid="stChatInput"] ::placeholder,
-            .stChatInput ::placeholder,
-            .stTextInput ::placeholder,
-            .stTextArea ::placeholder {
-                color: #94a3b8 !important;
-                opacity: 1 !important;
-            }
-
-            .stChatInput, .stChatInput * {
-                background: transparent !important;
-            }
-
-            .stButton>button, .stButton>button[type="submit"] {
-                background-color: #0d3658 !important;
-                color: #ffffff !important;
-                border-radius: 999px !important;
-                padding: 6px 12px !important;
-                border: none !important;
-            }
-            [data-testid="stSidebar"], .css-1lcbmhc, .css-1aumxhk {
-                background-color: #ffffff !important;
-                color: #124874 !important;
-            }
-            [data-testid="stSidebarHeader"] button {
-                color: #124874 !important;
-            }
             /* Message Container */
             .chat-msg-container {
                 display: flex;
@@ -174,14 +79,16 @@ def render_header():
             .justify-start { justify-content: flex-start; }
             .justify-end { justify-content: flex-end; }
 
+            /* Bubble Style */
             .msg-bubble {
-                max-width: 100%;
+                max-width: 85%;
                 display: flex;
                 flex-direction: column;
             }
             .items-start { align-items: flex-start; }
             .items-end { align-items: flex-end; }
 
+            /* Avatar & Label */
             .msg-info {
                 display: flex;
                 align-items: center;
@@ -211,8 +118,8 @@ def render_header():
                 letter-spacing: 0.05em;
             }
 
+            /* Content Bubble */
             .content-bubble {
-                width: 100%;
                 padding: 12px 20px;
                 border-radius: 18px;
                 font-size: 15px;
@@ -231,6 +138,7 @@ def render_header():
                 border-top-right-radius: 2px;
             }
 
+            /* Animation cho thinking */
             .dot-flashing {
                 display: flex;
                 gap: 4px;
@@ -247,22 +155,14 @@ def render_header():
                 0%, 100% { transform: translateY(0); }
                 50% { transform: translateY(-5px); }
             }
-
-            .stApp .main .block-container {
-                max-width: 100% !important;
-                padding-left: 0 !important;
-                padding-right: 0 !important;
-                margin: 0 auto !important;
-            }
         </style>
         <div class="hcmue-header">
-            <h1 style="margin:0; font-size: 42px;">CHATBOT HCMUE</h1>
-            <p style="margin:5px 0 0 0; opacity: 0.8; font-size: 18px;">Tư vấn quy chế đào tạo cho sinh viên khóa 50 trình độ đại học và cao đẳng tại Trường Đại học Sư phạm Thành phố Hồ Chí Minh</p>
+            <h1 style="margin:0; font-size: 24px;">HCMUE ASSISTANT</h1>
+            <p style="margin:5px 0 0 0; opacity: 0.8; font-size: 14px;">Hỗ trợ & tư vấn quy chế sinh viên</p>
         </div>
         """,
         unsafe_allow_html=True,
     )
-
 #===============tạo hàm helper=======================
 def display_chat_message(role, content, thinking=False):
     is_bot = role == "assistant"
@@ -275,8 +175,14 @@ def display_chat_message(role, content, thinking=False):
     bubble_class = "bot-content" if is_bot else "user-content"
 
     if thinking:
-        # Hiển thị đơn giản "..." thay vì animation
-        inner_content = '<div style="font-size:18px; color:#94a3b8; font-style:italic;">...</div>'
+        inner_content = """
+        <div class="dot-flashing">
+            <div class="dot" style="animation-delay: 0s"></div>
+            <div class="dot" style="animation-delay: 0.2s"></div>
+            <div class="dot" style="animation-delay: 0.4s"></div>
+            <span style="font-size: 12px; color: #94a3b8; margin-left: 10px; font-style: italic;">Đang kiểm tra sổ tay...</span>
+        </div>
+        """
     else:
         inner_content = content
 
@@ -295,57 +201,7 @@ def display_chat_message(role, content, thinking=False):
     """
     st.markdown(html, unsafe_allow_html=True)
 #=============================
-def render_sidebar_content():
-    # Header Sidebar
-    st.sidebar.markdown(
-        """
-        <div class="sidebar-header">
-            <div style="display: flex; align-items: center; gap: 12px;">
-                <div style="background: #124874; padding: 8px; border-radius: 10px; color: white;">
-                    <i class="fas fa-university" style="font-size: 20px;"></i>
-                </div>
-                <div>
-                    <h2 style="margin:0; font-size: 24px; color: #124874;">CHATBOT HCMUE</h2>
-                </div>
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
 
-    # Section: Hỏi nhanh
-    st.sidebar.markdown('<p class="sidebar-section-title">Gợi ý một số câu hỏi</p>', unsafe_allow_html=True)
-
-    quick_questions = [
-        ("Cảnh báo học vụ", "Điều kiện bị cảnh báo học tập là gì?"),
-        ("Giới hạn tín chỉ", "Giới hạn tín chỉ tối thiểu tối đa mỗi học kỳ được quy định thế nào?"),
-        ("Tạm dừng học", "Sinh viên được tạm dừng học trong những trường hợp nào?"),
-        ("Điều kiện tốt nghiệp ", " Điều kiện để được xét công nhận tốt nghiệp là gì?"),
-    ]
-
-    for label, query in quick_questions:
-        if st.sidebar.button(label, key=f"btn_{label}", use_container_width=True):
-            st.session_state.sidebar_selection = query
-            st.rerun()
-    st.sidebar.divider()
-    # Nút làm mới hội thoại
-    if st.sidebar.button("Làm mới cuộc hội thoại", use_container_width=True):
-        st.session_state.messages = [{"role": "assistant", "content": "Tôi có thể hỗ trợ gì cho các bạn?"}]
-        st.rerun()
-    st.sidebar.divider()
-    # Footer Sidebar
-    st.sidebar.markdown(
-        """
-        <div style="margin-top: 20px; padding: 15px; background: #f8fafc; border-radius: 12px; border: 1px solid #f1f5f9;">
-            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 5px;">
-                <div style="width: 8px; height: 8px; background: #10b981; border-radius: 50%;"></div>
-                <span style="font-size: 13px; font-weight: 700; color: #64748b; text-transform: uppercase;">Hệ thống Online</span>
-            </div>
-            <p style="font-size: 13px; color: #94a3b8; margin: 0;">Dữ liệu cập nhật dựa trên sổ tay sinh viên khóa 50.</p>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
 # =========================
 # CHỐNG SPAM
 # =========================
@@ -365,7 +221,7 @@ def allow_request():
         return False, "Bạn gửi hơi nhanh, vui lòng chờ một chút nhé."
 
     if st.session_state["count_today"] >= MAX_REQUESTS_PER_DAY:
-        return False, "Bạn đã hết lượt hỏi hôm nay."
+        return False, "Bạn đã sử dụng hết lượt hỏi hôm nay."
 
     st.session_state["last_req"] = now
     st.session_state["count_today"] += 1
@@ -391,7 +247,7 @@ def load_kb_texts():
 
 
 @st.cache_resource(show_spinner=True)
-def load_kb_vectorstore():
+def load_kb_vectorstore(api_key: str):
     texts = load_kb_texts()
 
     splitter = RecursiveCharacterTextSplitter(
@@ -403,26 +259,20 @@ def load_kb_vectorstore():
     for t in texts:
         chunks.extend(splitter.split_text(t))
 
-    api_key = os.getenv("GOOGLE_API_KEY") or st.secrets.get("GOOGLE_API_KEY")
-
     embeddings = GoogleGenerativeAIEmbeddings(
-        model="models/embedding-001",
+        model=EMBED_MODEL,
         google_api_key=api_key,
     )
 
-    # DEBUG thử 1 embedding trước
-    test = embeddings.embed_query("test")
-    print("Embedding OK, len =", len(test))
-
     return FAISS.from_texts(chunks, embedding=embeddings)
 
-@st.cache_resource(show_spinner=True)
-def load_kb_vectorstore():
-    api_key = os.getenv("GOOGLE_API_KEY") or st.secrets.get("GOOGLE_API_KEY")
+
+@st.cache_resource
+def load_qa_chain_cached(api_key: str):
     prompt_template = """
 Bạn là trợ lý hỗ trợ sinh viên.
 Trả lời ngắn gọn, rõ ràng, đúng trọng tâm.
-Chỉ ra thông tin nằm ở chỗ nào.
+
 NGỮ CẢNH:
 {context}
 
@@ -456,10 +306,10 @@ TRẢ LỜI:
 # =========================
 def quick_answer(option: str) -> str:
     keyword_map = {
-        "Cách báo học vụ": ["cảnh báo học vụ", "buộc thôi học"],
-        "Giới hạn tín chỉ": ["giới hạn", "tín chỉ"],
-        "Tạm dừng học tập": ["tạm dừng", "học tập"],
-        "Điều kiện tốt nghiệp": ["điều kiện", "tốt nghiệp"],
+        "Cách xét học bổng": ["học bổng"],
+        "Điều kiện xét học bổng": ["điều kiện", "học bổng"],
+        "Điều kiện cần và đủ để tốt nghiệp": ["tốt nghiệp"],
+        "Điều kiện xét học ngành thứ hai": ["ngành", "thứ hai"],
     }
 
     keywords = keyword_map.get(option, [])
@@ -492,34 +342,59 @@ def reset_chat():
     st.session_state.messages = [
         {
             "role": "assistant",
-            "content": "Tôi có thể hỗ trợ gì cho bạn?",
+            "content": "Tôi có thể hỗ trợ gì cho các bạn?",
         }
     ]
+
+
 # =========================
 # MAIN
 # =========================
 def main():
-    st.set_page_config(page_title=APP_TITLE, layout="wide")
+    st.set_page_config(page_title=APP_TITLE, layout="centered")
     render_header()
-    render_sidebar_content()
+
     load_dotenv()
     api_key = os.getenv("GOOGLE_API_KEY") or st.secrets.get(
         "GOOGLE_API_KEY"
     )
-    #st.write("KEY EXISTS:", "GOOGLE_API_KEY" in st.secrets)
+
     if not api_key:
         st.error("Chưa cấu hình GOOGLE_API_KEY.")
         st.stop()
-    
+
     st.session_state.setdefault(
         "messages",
         [
             {
                 "role": "assistant",
-                "content": "Tôi có thể hỗ trợ gì cho bạn?",
+                "content": "Tôi có thể hỗ trợ gì cho các bạn?",
             }
         ],
     )
+
+    with st.sidebar:
+        st.subheader("Hỏi nhanh")
+        for item in [
+            "Cách xét học bổng",
+            "Điều kiện xét học bổng",
+            "Điều kiện cần và đủ để tốt nghiệp",
+            "Điều kiện xét học ngành thứ hai",
+        ]:
+            if st.button(item, use_container_width=True):
+                st.session_state.messages.extend(
+                    [
+                        {"role": "user", "content": item},
+                        {
+                            "role": "assistant",
+                            "content": quick_answer(item),
+                        },
+                    ]
+                )
+
+        st.divider()
+        st.button("Xóa cuộc hội thoại", on_click=reset_chat)
+
     for m in st.session_state.messages:
         display_chat_message(m["role"], m["content"])
 
@@ -529,18 +404,8 @@ def main():
     vs = load_kb_vectorstore(api_key)
     chain = load_qa_chain_cached(api_key)
 
-    # 2. Nhận input từ User
-    prompt = st.chat_input("Nhập câu hỏi của bạn tại đây")
-
-    # Kiểm tra xem có dữ liệu từ Sidebar gửi qua không
-    if "sidebar_selection" in st.session_state and st.session_state.sidebar_selection:
-        question = st.session_state.sidebar_selection
-        # Xóa ngay sau khi lấy để tránh lặp lại khi rerun lần sau
-        del st.session_state.sidebar_selection
-    else:
-        question = prompt
-    # 3. NẾU CÓ CÂU HỎI (TỪ BẤT KỲ NGUỒN NÀO) THÌ XỬ LÝ
-    if question:
+    # 2. CHỈ DÙNG MỘT THANH NHẬP LIỆU DUY NHẤT
+    if question := st.chat_input("Nhập câu hỏi của bạn tại đây..."):
         # Kiểm tra giới hạn yêu cầu (Spam)
         ok, msg = allow_request()
         if not ok:
@@ -550,56 +415,33 @@ def main():
             st.session_state.messages.append({"role": "user", "content": question})
             display_chat_message("user", question)
 
-            # B. Tạo khung trống (placeholder) cho Bot
-            placeholder = st.empty()
-            with placeholder:
-                display_chat_message("assistant", "", thinking=True)
-
-            # C. Logic xử lý AI (RAG)
-            # C. Logic xử lý AI (RAG)
-            try:
-                # Tìm kiếm nội dung liên quan
-                docs = vs.similarity_search(question, k=TOP_K)
+            # B. Tạo khung trống (placeholder) để xử lý hiệu ứng "Thinking"
+            # Lưu ý: Avatar=None để không hiện khung mặc định của Streamlit chồng lên CSS của bạn
+            with st.chat_message("assistant", avatar=None):
+                 placeholder = st.empty()
+                 
+                 # Hiển thị trạng thái đang xử lý
+                 with placeholder:
+                     display_chat_message("assistant", "", thinking=True)
                 
-                # Chạy Chain để lấy kết quả
-                out = chain({"input_documents": docs, "question": question}, return_only_outputs=True)
-                answer = out.get("output_text", "Xin lỗi, tôi không tìm thấy thông tin phù hợp.")
-                
-                # Làm sạch mã (nếu có)
-                sanitized = re.sub(r"```.*?```", "[mã đã ẩn]", answer, flags=re.S)
+                 # C. Logic xử lý AI (RAG)
+                 try:
+                     # Tìm kiếm nội dung liên quan trong file JSON
+                     docs = vs.similarity_search(question, k=TOP_K)
+                     
+                     # Chạy Chain để trả lời dựa trên ngữ cảnh
+                     out = chain({"input_documents": docs, "question": question}, return_only_outputs=True)
+                     answer = out.get("output_text", "Xin lỗi, tôi không tìm thấy thông tin phù hợp trong quy chế.")
+                 except Exception as e:
+                     answer = f"Đã xảy ra lỗi khi xử lý: {str(e)}"
 
-                # D. HIỂN THỊ THEO TỪ (WORD-BY-WORD)
-                words = sanitized.split(" ")
-                full_display = ""
+                 # D. Xóa hiệu ứng Thinking và thay bằng câu trả lời thực tế
+                 placeholder.empty()
+                 with placeholder:
+                     display_chat_message("assistant", answer)
                 
-                for i in range(len(words)):
-                    full_display += words[i] + " "
-                    if i % 3 == 0 or i == len(words) - 1:
-                        with placeholder:
-                            display_chat_message("assistant", full_display.strip())
-                        time.sleep(0.04)
+                 # E. Lưu câu trả lời của Bot vào lịch sử hội thoại
+                 st.session_state.messages.append({"role": "assistant", "content": answer})
 
-                # Lưu vào lịch sử
-                st.session_state.messages.append({"role": "assistant", "content": sanitized})
-
-            except Exception as e:
-                placeholder.empty()
-                error_str = str(e)
-                # KIỂM TRA LỖI 429 HOẶC CẠN KIỆT QUOTA
-                if "429" in error_str or "quota" in error_str.lower() or "limit" in error_str.lower():
-                    custom_msg = "Bạn đã hết lượt hỏi hôm nay. Vui lòng quay lại sau hoặc thử lại vào ngày mai nhé!"
-                else:
-                    custom_msg = f"Đã xảy ra lỗi: {error_str}"
-                
-                with placeholder:
-                    display_chat_message("assistant", custom_msg)
-                
-                # Lưu thông báo lỗi vào lịch sử để không bị mất khi rerun
-                st.session_state.messages.append({"role": "assistant", "content": custom_msg})
-
-            except Exception as e:
-                placeholder.empty()
-                with placeholder:
-                    display_chat_message("assistant", f"Đã xảy ra lỗi: {str(e)}")
 if __name__ == "__main__":
     main()
