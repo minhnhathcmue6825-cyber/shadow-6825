@@ -17,7 +17,12 @@ from langchain_google_genai import (
 from langchain_community.vectorstores import FAISS
 from langchain_core.prompts import PromptTemplate
 from langchain_classic.chains.question_answering import load_qa_chain
-
+def get_google_api_key():
+    # Ưu tiên Streamlit Secrets (Cloud)
+    if "GOOGLE_API_KEY" in st.secrets:
+        return st.secrets["GOOGLE_API_KEY"]
+    # Fallback cho local
+    return os.getenv("GOOGLE_API_KEY")
 
 # =========================
 # CẤU HÌNH
@@ -394,7 +399,7 @@ def load_kb_texts():
     return texts
 
 
-@st.cache_resource(show_spinner=True)
+@st.cache_resource(show_spinner=True, ttl=3600)
 def load_kb_vectorstore(api_key: str):
     texts = load_kb_texts()
 
@@ -415,7 +420,7 @@ def load_kb_vectorstore(api_key: str):
     return FAISS.from_texts(chunks, embedding=embeddings)
 
 
-@st.cache_resource
+@st.cache_resource(ttl=3600)
 def load_qa_chain_cached(api_key: str):
     prompt_template = """
 Bạn là trợ lý hỗ trợ sinh viên.
@@ -502,10 +507,7 @@ def main():
     st.set_page_config(page_title=APP_TITLE, layout="wide")
     render_header()
     render_sidebar_content()
-    load_dotenv()
-    api_key = os.getenv("GOOGLE_API_KEY") or st.secrets.get(
-        "GOOGLE_API_KEY"
-    )
+    api_key = get_google_api_key()
 
     if not api_key:
         st.error("Chưa cấu hình GOOGLE_API_KEY.")
