@@ -32,16 +32,16 @@ APP_DIR = Path(__file__).resolve().parent
 KB_JSON_PATH = APP_DIR / "chunks.json"
 
 MODEL_NAME = "gemini-2.5-flash"
-EMBED_MODEL = "models/embedding-001"
+EMBED_MODEL = "models/gemini-embedding-001"
 
 MIN_SECONDS_BETWEEN_REQUESTS = 2
 MAX_REQUESTS_PER_DAY = 30
 
-CHUNK_SIZE = 1000
-CHUNK_OVERLAP = 80
+CHUNK_SIZE = 1600
+CHUNK_OVERLAP = 200
 TOP_K = 4
 
-MAX_OUTPUT_TOKENS = 800
+MAX_OUTPUT_TOKENS = 512
 TEMPERATURE = 0.2
 # =========================
 # HEADER
@@ -260,7 +260,7 @@ def render_header():
         </style>
         <div class="hcmue-header">
             <h1 style="margin:0; font-size: 42px;">CHATBOT HCMUE</h1>
-            <p style="margin:5px 0 0 0; opacity: 0.8; font-size: 18px;">Tư vấn quy chế đào tạo cho sinh viên khóa 50 trình độ đại học và cao đẳng tại Trường Đại học Sư phạm Thành phố Hồ Chí Minh</p>
+            <p style="margin:5px 0 0 0; opacity: 0.8; font-size: 18px;">Tư vấn quy chế đào tạo cho sinh viên Trường Đại học Sư phạm Thành phố Hồ Chí Minh</p>
         </div>
         """,
         unsafe_allow_html=True,
@@ -308,7 +308,8 @@ def render_sidebar_content():
                     <i class="fas fa-university" style="font-size: 20px;"></i>
                 </div>
                 <div>
-                    <h2 style="margin:0; font-size: 24px; color: #124874;">CHATBOT HCMUE</h2>
+                    <h2 style="margin:0; font-size: 28px; color: #124874;">CHATBOT HCMUE</h2>
+                    <p style="margin:0; font-size: 13px; color: #64748b;">Trợ lý hỗ trợ sinh viên khóa 50</p>
                 </div>
             </div>
         </div>
@@ -489,9 +490,11 @@ def reset_chat():
     st.session_state.messages = [
         {
             "role": "assistant",
-            "content": "Tôi có thể hỗ trợ gì cho bạn?",
+            "content": "Tôi có thể hỗ trợ gì cho các bạn?",
         }
     ]
+
+
 # =========================
 # MAIN
 # =========================
@@ -513,7 +516,7 @@ def main():
         [
             {
                 "role": "assistant",
-                "content": "Tôi có thể hỗ trợ gì cho bạn?",
+                "content": "Tôi có thể hỗ trợ gì cho các bạn?",
             }
         ],
     )
@@ -526,8 +529,9 @@ def main():
     vs = load_kb_vectorstore(api_key)
     chain = load_qa_chain_cached(api_key)
 
-    # 2. Nhận input từ User
-    prompt = st.chat_input("Nhập câu hỏi của bạn tại đây")
+    # 2. CHỈ DÙNG MỘT THANH NHẬP LIỆU DUY NHẤT
+    # 2. XỬ LÝ ĐẦU VÀO (TỪ CHAT INPUT HOẶC SIDEBAR)
+    prompt = st.chat_input("Nhập câu hỏi của bạn tại đây...")
 
     # Kiểm tra xem có dữ liệu từ Sidebar gửi qua không
     if "sidebar_selection" in st.session_state and st.session_state.sidebar_selection:
@@ -536,6 +540,7 @@ def main():
         del st.session_state.sidebar_selection
     else:
         question = prompt
+
     # 3. NẾU CÓ CÂU HỎI (TỪ BẤT KỲ NGUỒN NÀO) THÌ XỬ LÝ
     if question:
         # Kiểm tra giới hạn yêu cầu (Spam)
@@ -547,56 +552,49 @@ def main():
             st.session_state.messages.append({"role": "user", "content": question})
             display_chat_message("user", question)
 
-            # B. Tạo khung trống (placeholder) cho Bot
+            # B. Tạo khung trống (placeholder) để xử lý hiệu ứng "Thinking"
             placeholder = st.empty()
+            
+            # Hiển thị trạng thái đang xử lý
             with placeholder:
                 display_chat_message("assistant", "", thinking=True)
-
-            # C. Logic xử lý AI (RAG)
+            
             # C. Logic xử lý AI (RAG)
             try:
-                # Tìm kiếm nội dung liên quan
+                # Tìm kiếm nội dung liên quan trong file JSON
                 docs = vs.similarity_search(question, k=TOP_K)
                 
-                # Chạy Chain để lấy kết quả
+                # Chạy Chain để trả lời dựa trên ngữ cảnh
                 out = chain({"input_documents": docs, "question": question}, return_only_outputs=True)
-                answer = out.get("output_text", "Xin lỗi, tôi không tìm thấy thông tin phù hợp.")
-                
-                # Làm sạch mã (nếu có)
+                answer = out.get("output_text", "Xin lỗi, tôi không tìm thấy thông tin phù hợp trong quy chế.")
+            except Exception as e:
+                answer = f"Đã xảy ra lỗi khi xử lý: {str(e)}"
+
+            # D. Xóa hiệu ứng Thinking và thay bằng hiệu ứng "suy luận" (typing)
+            # Ẩn các khối mã để tránh hiển thị code thô
+            try:
                 sanitized = re.sub(r"```.*?```", "[mã đã ẩn]", answer, flags=re.S)
+            except Exception:
+                sanitized = answer
 
-                # D. HIỂN THỊ THEO TỪ (WORD-BY-WORD)
-                words = sanitized.split(" ")
-                full_display = ""
-                
-                for i in range(len(words)):
-                    full_display += words[i] + " "
-                    if i % 3 == 0 or i == len(words) - 1:
-                        with placeholder:
-                            display_chat_message("assistant", full_display.strip())
-                        time.sleep(0.01)
-
-                # Lưu vào lịch sử
-                st.session_state.messages.append({"role": "assistant", "content": sanitized})
-
-            except Exception as e:
-                placeholder.empty()
-                error_str = str(e)
-                # KIỂM TRA LỖI 429 HOẶC CẠN KIỆT QUOTA
-                if "429" in error_str or "quota" in error_str.lower() or "limit" in error_str.lower():
-                    custom_msg = "Bạn đã hết lượt hỏi hôm nay. Vui lòng quay lại sau hoặc thử lại vào ngày mai nhé!"
-                else:
-                    custom_msg = f"Đã xảy ra lỗi: {error_str}"
-                
-                with placeholder:
-                    display_chat_message("assistant", custom_msg)
-                
-                # Lưu thông báo lỗi vào lịch sử để không bị mất khi rerun
-                st.session_state.messages.append({"role": "assistant", "content": custom_msg})
-
-            except Exception as e:
+            # Hiển thị progressive typing trong cùng một placeholder
+            try:
+                for i in range(1, len(sanitized) + 1):
+                    partial = sanitized[:i]
+                    placeholder.empty()
+                    with placeholder:
+                        display_chat_message("assistant", partial)
+                    time.sleep(0.01)
+            except Exception:
+                # Fallback: hiển thị toàn bộ nếu có lỗi khi animate
                 placeholder.empty()
                 with placeholder:
-                    display_chat_message("assistant", f"Đã xảy ra lỗi: {str(e)}")
+                    display_chat_message("assistant", sanitized)
+            
+            # E. Lưu câu trả lời của Bot vào lịch sử hội thoại
+            st.session_state.messages.append({"role": "assistant", "content": sanitized})
+
+            # F. Force Rerun để cập nhật lại giao diện hoàn chỉnh (tuỳ chọn)
+            # st.rerun()
 if __name__ == "__main__":
     main()
