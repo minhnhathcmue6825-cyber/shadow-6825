@@ -5,24 +5,32 @@ import re
 import base64
 from datetime import date
 from pathlib import Path
+from io import BytesIO
 
 import streamlit as st
-from dotenv import load_dotenv
 
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_google_genai import (
-    GoogleGenerativeAIEmbeddings,
-    ChatGoogleGenerativeAI,
-)
-from langchain_community.vectorstores import FAISS
-from langchain_core.prompts import PromptTemplate
-from langchain_classic.chains.question_answering import load_qa_chain
-def get_google_api_key():
-    # Ưu tiên Streamlit Secrets (Cloud)
-    if "GOOGLE_API_KEY" in st.secrets:
-        return st.secrets["GOOGLE_API_KEY"]
-    # Fallback cho local
-    return os.getenv("GOOGLE_API_KEY")
+# Optional: if running locally and you want to load a .env file, uncomment the next line
+# from dotenv import load_dotenv
+
+# Third-party ML/LLM imports wrapped to give friendly errors on missing packages
+try:
+    from langchain_text_splitters import RecursiveCharacterTextSplitter
+    from langchain_google_genai import (
+        GoogleGenerativeAIEmbeddings,
+        ChatGoogleGenerativeAI,
+    )
+    from langchain_community.vectorstores import FAISS
+    from langchain_core.prompts import PromptTemplate
+    from langchain_classic.chains.question_answering import load_qa_chain
+except Exception as e:
+    MISSING_IMPORT_ERROR = str(e)
+    # We'll surface a friendly explanation later in the UI
+    RecursiveCharacterTextSplitter = None
+    GoogleGenerativeAIEmbeddings = None
+    ChatGoogleGenerativeAI = None
+    FAISS = None
+    PromptTemplate = None
+    load_qa_chain = None
 
 # =========================
 # CẤU HÌNH
@@ -34,7 +42,7 @@ APP_SUBTITLE = (
 )
 
 APP_DIR = Path(__file__).resolve().parent
-KB_JSON_PATH = APP_DIR / "chunks.json"
+KB_JSON_PATH = APP_DIR / "chunks.json"  # If not present, user can upload via sidebar
 
 MODEL_NAME = "gemini-2.5-flash"
 EMBED_MODEL = "models/gemini-embedding-001"
@@ -49,8 +57,7 @@ TOP_K = 4
 MAX_OUTPUT_TOKENS = 512
 TEMPERATURE = 0.2
 # =========================
-# HEADER
-# =========================
+
 def render_header():
     st.markdown(
         """
@@ -329,7 +336,7 @@ def render_sidebar_content():
         ("Cảnh báo học vụ", "Điều kiện bị cảnh báo học tập và buộc thôi học là gì?"),
         ("Giới hạn tín chỉ", "Giới hạn tín chỉ tối thiểu tối đa mỗi học kỳ được quy định thế nào?"),
         ("Tạm dừng học", "Sinh viên được tạm dừng học trong những trường hợp nào?"),
-        ("Điều kiện tốt nghiệp ", " Điều kiện để được xét công nhận tốt nghiệp là gì?"),
+        ("Điều kiện tốt nghiệp ", "Điều kiện để được xét công nhận tốt nghiệp là gì?"),
     ]
 
     for label, query in quick_questions:
@@ -355,9 +362,7 @@ def render_sidebar_content():
         """,
         unsafe_allow_html=True
     )
-# =========================
-# CHỐNG SPAM
-# =========================
+
 def allow_request():
     now = time.time()
     today = str(date.today())
@@ -386,21 +391,31 @@ def allow_request():
 # =========================
 @st.cache_data
 def load_kb_texts():
-    if not KB_JSON_PATH.exists():
-        raise FileNotFoundError(f"Không tìm thấy file: {KB_JSON_PATH}")
-
-    with open(KB_JSON_PATH, "r", encoding="utf-8") as f:
-        data = json.load(f)
+    """
+    Load JSON KB data. Accepts uploaded JSON (stored in session_state['uploaded_kb'])
+    or falls back to reading KB_JSON_PATH in the repo.
+    """
+    # If user uploaded KB via the sidebar, use that
+    uploaded = st.session_state.get("uploaded_kb")
+    if uploaded:
+        data = uploaded
+    else:
+        if not KB_JSON_PATH.exists():
+            raise FileNotFoundError(f"Không tìm thấy file: {KB_JSON_PATH}. Bạn có thể upload file JSON trong sidebar.")
+        with open(KB_JSON_PATH, "r", encoding="utf-8") as f:
+            data = json.load(f)
 
     texts = [item["content"] for item in data if "content" in item]
     if not texts:
         raise ValueError("File JSON không có nội dung hợp lệ.")
-
     return texts
 
 
-@st.cache_resource(show_spinner=True, ttl=3600)
+@st.cache_resource(show_spinner=True)
 def load_kb_vectorstore(api_key: str):
+    if RecursiveCharacterTextSplitter is None:
+        raise RuntimeError(f"Thiếu package cần thiết: {MISSING_IMPORT_ERROR}")
+
     texts = load_kb_texts()
 
     splitter = RecursiveCharacterTextSplitter(
@@ -420,11 +435,14 @@ def load_kb_vectorstore(api_key: str):
     return FAISS.from_texts(chunks, embedding=embeddings)
 
 
-@st.cache_resource(ttl=3600)
+@st.cache_resource
 def load_qa_chain_cached(api_key: str):
+    if ChatGoogleGenerativeAI is None:
+        raise RuntimeError(f"Thiếu package cần thiết: {MISSING_IMPORT_ERROR}")
+
     prompt_template = """
 Bạn là trợ lý hỗ trợ sinh viên.
-Trả lời ngắn gọn, rõ ràng, dễ hiểu, phải dựa vào NGỮ CẢNH được cung cấp, và phải nó nó nằm ở phần nào trong tài liệu.
+Trả lời ngắn gọn, rõ ràng, dễ hiểu, phải dựa vào NGỮ CẢNH được cung cấp, và phải chỉ rõ nó nằm ở phần nào trong tài liệu.
 
 NGỮ CẢNH:
 {context}
@@ -454,14 +472,11 @@ TRẢ LỜI:
     )
 
 
-# =========================
-# QUICK ANSWER
-# =========================
 def quick_answer(option: str) -> str:
     keyword_map = {
-        "Cách báo học vụ": ["cảnh báo học vụ", "buộc thôi học"],
+        "Cảnh báo học vụ": ["cảnh báo học vụ", "buộc thôi học"],
         "Giới hạn tín chỉ": ["giới hạn", "tín chỉ"],
-        "Tạm dừng học tập": ["tạm dừng", "học tập"],
+        "Tạm dừng học": ["tạm dừng", "học tập"],
         "Điều kiện tốt nghiệp": ["điều kiện", "tốt nghiệp"],
     }
 
@@ -488,9 +503,6 @@ def quick_answer(option: str) -> str:
     return "Không tìm thấy nội dung phù hợp trong quy chế."
 
 
-# =========================
-# RESET CHAT
-# =========================
 def reset_chat():
     st.session_state.messages = [
         {
@@ -500,6 +512,32 @@ def reset_chat():
     ]
 
 
+def get_api_key_from_env_or_secrets():
+    """
+    Prefer st.secrets (Streamlit Cloud). Fallback to environment variables and then to a manual input (for local testing).
+    """
+    # Note: On Streamlit Cloud, add the secret under Settings -> Secrets: GOOGLE_API_KEY
+    api_key = None
+    try:
+        api_key = st.secrets.get("GOOGLE_API_KEY")
+    except Exception:
+        api_key = None
+
+    if not api_key:
+        api_key = os.getenv("GOOGLE_API_KEY")
+
+    # If still not found, show a small input in the sidebar for quick testing (not for production)
+    if not api_key:
+        st.sidebar.warning(
+            "Chưa tìm thấy GOOGLE_API_KEY. Trên Streamlit Cloud: đặt vào Settings → Secrets với key 'GOOGLE_API_KEY'."
+        )
+        tmp = st.sidebar.text_input("Google API Key (tạm, chỉ cho testing)", type="password")
+        if tmp:
+            api_key = tmp
+
+    return api_key
+
+
 # =========================
 # MAIN
 # =========================
@@ -507,11 +545,39 @@ def main():
     st.set_page_config(page_title=APP_TITLE, layout="wide")
     render_header()
     render_sidebar_content()
-    api_key = get_google_api_key()
 
-    if not api_key:
-        st.error("Chưa cấu hình GOOGLE_API_KEY.")
+    # If imports failed, show helpful message and stop
+    if RecursiveCharacterTextSplitter is None:
+        st.error(
+            "Ứng dụng thiếu một số package bắt buộc để chạy LLM/Embeddings.\n\n"
+            "Lỗi: " + MISSING_IMPORT_ERROR + "\n\n"
+            "Hãy đảm bảo bạn đã thêm các package cần thiết vào requirements.txt và redeploy."
+        )
         st.stop()
+
+    # Optional: load_dotenv()  # Only for local dev if you want to read a .env file
+
+    api_key = get_api_key_from_env_or_secrets()
+    if not api_key:
+        st.error("Chưa cấu hình GOOGLE_API_KEY. Cung cấp qua Streamlit Secrets hoặc nhập tạm ở sidebar.")
+        st.stop()
+
+    # Allow user to upload KB JSON if repo doesn't include it (helpful on Streamlit Cloud)
+    if not KB_JSON_PATH.exists():
+        st.sidebar.info(
+            "Không tìm thấy chunks.json trong repository. Bạn có thể upload file JSON (dữ liệu KB) dưới đây."
+        )
+        uploaded_file = st.sidebar.file_uploader("Upload chunks.json (format như chunks.json)", type=["json"])
+        if uploaded_file is not None:
+            try:
+                uploaded_bytes = uploaded_file.read()
+                data = json.loads(uploaded_bytes.decode("utf-8"))
+                # store in session to be used by load_kb_texts()
+                st.session_state["uploaded_kb"] = data
+                st.sidebar.success("Đã upload thành công. Bắt đầu xử lý dữ liệu.")
+            except Exception as e:
+                st.sidebar.error(f"Không thể đọc file JSON: {e}")
+                st.stop()
 
     st.session_state.setdefault(
         "messages",
@@ -525,14 +591,15 @@ def main():
     for m in st.session_state.messages:
         display_chat_message(m["role"], m["content"])
 
-    # ... các bước xử lý vector store ...
-
-# 1. Khởi tạo Vector Store và Chain (Làm trước khi nhận input)
-    vs = load_kb_vectorstore(api_key)
-    chain = load_qa_chain_cached(api_key)
+    # 1. Khởi tạo Vector Store và Chain (Làm trước khi nhận input)
+    try:
+        vs = load_kb_vectorstore(api_key)
+        chain = load_qa_chain_cached(api_key)
+    except Exception as e:
+        st.error(f"Không thể khởi tạo vectorstore/chain: {e}")
+        st.stop()
 
     # 2. CHỈ DÙNG MỘT THANH NHẬP LIỆU DUY NHẤT
-    # 2. XỬ LÝ ĐẦU VÀO (TỪ CHAT INPUT HOẶC SIDEBAR)
     prompt = st.chat_input("Nhập câu hỏi của bạn tại đây...")
 
     # Kiểm tra xem có dữ liệu từ Sidebar gửi qua không
@@ -543,43 +610,30 @@ def main():
     else:
         question = prompt
 
-    # 3. NẾU CÓ CÂU HỎI (TỪ BẤT KỲ NGUỒN NÀO) THÌ XỬ LÝ
     if question:
-        # Kiểm tra giới hạn yêu cầu (Spam)
         ok, msg = allow_request()
         if not ok:
             st.warning(msg)
         else:
-            # A. Thêm câu hỏi của User vào lịch sử và hiển thị ngay
             st.session_state.messages.append({"role": "user", "content": question})
             display_chat_message("user", question)
 
-            # B. Tạo khung trống (placeholder) để xử lý hiệu ứng "Thinking"
             placeholder = st.empty()
-            
-            # Hiển thị trạng thái đang xử lý
             with placeholder:
                 display_chat_message("assistant", "", thinking=True)
-            
-            # C. Logic xử lý AI (RAG)
+
             try:
-                # Tìm kiếm nội dung liên quan trong file JSON
                 docs = vs.similarity_search(question, k=TOP_K)
-                
-                # Chạy Chain để trả lời dựa trên ngữ cảnh
                 out = chain({"input_documents": docs, "question": question}, return_only_outputs=True)
                 answer = out.get("output_text", "Xin lỗi, tôi không tìm thấy thông tin phù hợp trong quy chế.")
             except Exception as e:
                 answer = f"Đã xảy ra lỗi khi xử lý: {str(e)}"
 
-            # D. Xóa hiệu ứng Thinking và thay bằng hiệu ứng "suy luận" (typing)
-            # Ẩn các khối mã để tránh hiển thị code thô
             try:
                 sanitized = re.sub(r"```.*?```", "[mã đã ẩn]", answer, flags=re.S)
             except Exception:
                 sanitized = answer
 
-            # Hiển thị progressive typing trong cùng một placeholder
             try:
                 for i in range(1, len(sanitized) + 1):
                     partial = sanitized[:i]
@@ -588,15 +642,11 @@ def main():
                         display_chat_message("assistant", partial)
                     time.sleep(0.01)
             except Exception:
-                # Fallback: hiển thị toàn bộ nếu có lỗi khi animate
                 placeholder.empty()
                 with placeholder:
                     display_chat_message("assistant", sanitized)
-            
-            # E. Lưu câu trả lời của Bot vào lịch sử hội thoại
+
             st.session_state.messages.append({"role": "assistant", "content": sanitized})
 
-            # F. Force Rerun để cập nhật lại giao diện hoàn chỉnh (tuỳ chọn)
-            # st.rerun()
 if __name__ == "__main__":
     main()
