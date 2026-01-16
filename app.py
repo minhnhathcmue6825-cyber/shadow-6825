@@ -32,13 +32,13 @@ APP_DIR = Path(__file__).resolve().parent
 KB_JSON_PATH = APP_DIR / "chunks.json"
 
 MODEL_NAME = "gemini-2.5-flash"
-EMBED_MODEL = "models/gemini-embedding-001"
+EMBED_MODEL = "models/embedding-001"
 
 MIN_SECONDS_BETWEEN_REQUESTS = 2
 MAX_REQUESTS_PER_DAY = 30
 
 CHUNK_SIZE = 1000
-CHUNK_OVERLAP = 100
+CHUNK_OVERLAP = 80
 TOP_K = 4
 
 MAX_OUTPUT_TOKENS = 800
